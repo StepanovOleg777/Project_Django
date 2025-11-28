@@ -1,0 +1,112 @@
+{% extends 'catalog/base.html' %}
+
+{% block title %}Управление продуктами{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-card {
+        transition: all 0.3s ease;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    .btn-group .btn {
+        border-radius: 6px;
+        margin: 2px;
+    }
+    .price-badge {
+        font-size: 1.1em;
+        font-weight: bold;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="display-5 fw-bold">📦 Управление продуктами</h1>
+        <a href="{% url 'catalog:product_create' %}" class="btn btn-success btn-lg">
+            ➕ Добавить продукт
+        </a>
+    </div>
+
+    {% if products %}
+    <div class="row">
+        {% for product in products %}
+        <div class="col-lg-6 col-xl-4 mb-4">
+            <div class="card product-card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="flex-grow-1">
+                            <h5 class="card-title fw-bold text-primary">{{ product.name }}</h5>
+                            <p class="card-text mb-1">
+                                <small class="text-muted">
+                                    📂 {{ product.category.name }}
+                                </small>
+                            </p>
+                            <p class="mb-2">
+                                <span class="price-badge text-success">{{ product.price }} руб.</span>
+                            </p>
+                        </div>
+                        {% if product.image %}
+                            <img src="{{ product.image.url }}" class="rounded ms-3" alt="{{ product.name }}"
+                                 style="width: 80px; height: 80px; object-fit: cover;">
+                        {% else %}
+                            <div class="bg-light rounded d-flex align-items-center justify-content-center ms-3"
+                                 style="width: 80px; height: 80px;">
+                                <span class="text-muted small">🖼️ Нет фото</span>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <p class="card-text text-muted mb-3">
+                        {{ product.description|truncatechars:120|default:"Описание отсутствует" }}
+                    </p>
+
+                    <div class="btn-group w-100" role="group">
+                        <a href="{% url 'catalog:product_detail' product.pk %}" class="btn btn-outline-primary">
+                            👁️ Просмотр
+                        </a>
+                        <a href="{% url 'catalog:product_update' product.pk %}" class="btn btn-outline-secondary">
+                            ✏️ Редактировать
+                        </a>
+                        <a href="{% url 'catalog:product_delete' product.pk %}" class="btn btn-outline-danger">
+                            🗑️ Удалить
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-top-0">
+                    <small class="text-muted">
+                        📅 Создан: {{ product.created_at|date:"d.m.Y" }}
+                        {% if product.updated_at != product.created_at %}
+                            <br>🔄 Обновлен: {{ product.updated_at|date:"d.m.Y" }}
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="mb-4">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+        </div>
+        <h3 class="text-muted mb-3">Продукты отсутствуют</h3>
+        <p class="text-muted mb-4">Добавьте первый продукт, чтобы начать работу</p>
+        <a href="{% url 'catalog:product_create' %}" class="btn btn-primary btn-lg">
+            ➕ Добавить первый продукт
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

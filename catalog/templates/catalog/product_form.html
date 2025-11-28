@@ -1,0 +1,159 @@
+{% extends 'catalog/base.html' %}
+
+{% block title %}
+    {% if object %}Редактирование {{ object.name }}{% else %}Создание продукта{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: none;
+        border-radius: 10px;
+    }
+    .form-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px 10px 0 0 !important;
+    }
+    .form-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 2px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+    .form-control-lg {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+    .file-input-custom {
+        padding: 12px;
+        background-color: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    .file-input-custom:hover {
+        border-color: #667eea;
+        background-color: #e9ecef;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 8px;
+        padding: 10px 30px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+    }
+    .btn-secondary {
+        border-radius: 8px;
+        padding: 10px 30px;
+        font-weight: 600;
+    }
+    .field-icon {
+        margin-right: 8px;
+        opacity: 0.7;
+    }
+    .price-input {
+        font-weight: bold;
+        color: #28a745 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card form-card">
+                <div class="card-header form-header">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-{% if object %}pencil-square{% else %}plus-circle{% endif %} me-2"></i>
+                        {% if object %}
+                            ✏️ Редактирование: {{ object.name }}
+                        {% else %}
+                            ➕ Создание нового продукта
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+
+                        {% for field in form %}
+                        <div class="mb-4">
+                            <label for="{{ field.id_for_label }}" class="form-label">
+                                {% if field.name == 'name' %}📝{% endif %}
+                                {% if field.name == 'description' %}📄{% endif %}
+                                {% if field.name == 'category' %}📂{% endif %}
+                                {% if field.name == 'price' %}💰{% endif %}
+                                {% if field.name == 'image' %}🖼️{% endif %}
+                                {{ field.label }}
+                                {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                            </label>
+
+                            {{ field }}
+
+                            {% if field.help_text %}
+                                <div class="form-text text-muted mt-1">
+                                    <small>{{ field.help_text }}</small>
+                                </div>
+                            {% endif %}
+
+                            {% if field.errors %}
+                                <div class="alert alert-danger mt-2 p-2">
+                                    <small>
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        {{ field.errors|striptags }}
+                                    </small>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                            <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">
+                                ← Назад к списку
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if object %}
+                                    💾 Сохранить изменения
+                                {% else %}
+                                    ✅ Создать продукт
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Информационная панель -->
+            <div class="card mt-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">📋 Правила заполнения формы</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-1">✅ Название и описание не должны содержать запрещенные слова</li>
+                        <li class="mb-1">✅ Цена должна быть положительным числом</li>
+                        <li class="mb-1">✅ Рекомендуется загружать изображение товара</li>
+                        <li class="mb-1">✅ Все поля, отмеченные *, обязательны для заполнения</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

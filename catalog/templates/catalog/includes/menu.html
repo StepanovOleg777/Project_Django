@@ -1,16 +1,19 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand" href="{% url 'home' %}">🛍️ Магазин</a>
+        <a class="navbar-brand" href="{% url 'catalog:home' %}">🛍️ Магазин</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'home' %}">🏠 Главная</a>
+                    <a class="nav-link" href="{% url 'catalog:home' %}">🏠 Главная</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'contacts' %}">📞 Контакты</a>
+                    <a class="nav-link" href="{% url 'catalog:contacts' %}">📞 Контакты</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'catalog:product_list' %}">📦 Управление товарами</a>
                 </li>
             </ul>
             <form class="d-flex">
