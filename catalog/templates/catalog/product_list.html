@@ -1,4 +1,5 @@
 {% extends 'catalog/base.html' %}
+{% load static %}
 
 {% block title %}Управление продуктами{% endblock %}
 
@@ -27,16 +28,47 @@
         padding: 3rem;
         color: #6c757d;
     }
+    .status-badge {
+        font-size: 0.85em;
+        padding: 0.25em 0.6em;
+    }
+    .owner-info {
+        font-size: 0.8em;
+        color: #6c757d;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
+    <!-- Отладочная информация (удалить после тестирования) -->
+    <div class="alert alert-info mb-4">
+        <h6><i class="fas fa-bug"></i> Отладка прав:</h6>
+        <p class="mb-1"><strong>Пользователь:</strong> {{ user.email }}</p>
+        <p class="mb-1"><strong>Группы:</strong>
+            {% for group in user.groups.all %}
+                <span class="badge bg-primary">{{ group.name }}</span>
+            {% empty %}
+                <span class="badge bg-secondary">Нет групп</span>
+            {% endfor %}
+        </p>
+        <p class="mb-0"><strong>Право can_unpublish_product:</strong>
+            {% if perms.catalog.can_unpublish_product %}
+                <span class="badge bg-success">ЕСТЬ ✓</span>
+            {% else %}
+                <span class="badge bg-danger">НЕТ ✗</span>
+            {% endif %}
+        </p>
+    </div>
+    <!-- Конец отладочной информации -->
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="display-5 fw-bold">📦 Управление продуктами</h1>
+        {% if perms.catalog.add_product %}
         <a href="{% url 'catalog:product_create' %}" class="btn btn-success btn-lg">
-            ➕ Добавить продукт
+            <i class="fas fa-plus"></i> Добавить продукт
         </a>
+        {% endif %}
     </div>
 
     {% if products %}
@@ -50,20 +82,51 @@
                             <h5 class="card-title fw-bold text-primary">{{ product.name }}</h5>
                             <p class="card-text mb-1">
                                 <small class="text-muted">
-                                    📂 {{ product.category.name }}
+                                    <i class="fas fa-folder"></i> {{ product.category.name }}
                                 </small>
                             </p>
                             <p class="mb-2">
-                                <span class="price-badge text-success">{{ product.price }} руб.</span>
+                                <span class="price-badge text-success">
+                                    <i class="fas fa-ruble-sign"></i> {{ product.price }}
+                                </span>
                             </p>
+
+                            <!-- Статус продукта -->
+                            <div class="mb-2">
+                                {% if product.is_published %}
+                                    <span class="badge bg-success status-badge">
+                                        <i class="fas fa-check-circle"></i> Опубликовано
+                                    </span>
+                                {% elif product.status == 'moderation' %}
+                                    <span class="badge bg-warning status-badge">
+                                        <i class="fas fa-clock"></i> На модерации
+                                    </span>
+                                {% elif product.status == 'rejected' %}
+                                    <span class="badge bg-danger status-badge">
+                                        <i class="fas fa-times-circle"></i> Отклонено
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary status-badge">
+                                        <i class="fas fa-file-alt"></i> Черновик
+                                    </span>
+                                {% endif %}
+
+                                <!-- Владелец -->
+                                {% if product.owner %}
+                                <span class="badge bg-info status-badge">
+                                    <i class="fas fa-user"></i> {{ product.owner.email|truncatechars:15 }}
+                                </span>
+                                {% endif %}
+                            </div>
                         </div>
+
                         {% if product.image %}
                             <img src="{{ product.image.url }}" class="rounded ms-3" alt="{{ product.name }}"
                                  style="width: 80px; height: 80px; object-fit: cover;">
                         {% else %}
                             <div class="bg-light rounded d-flex align-items-center justify-content-center ms-3"
                                  style="width: 80px; height: 80px;">
-                                <span class="text-muted small">🖼️ Нет фото</span>
+                                <span class="text-muted small"><i class="fas fa-image"></i> Нет фото</span>
                             </div>
                         {% endif %}
                     </div>
@@ -72,23 +135,58 @@
                         {{ product.description|truncatechars:120|default:"Описание отсутствует" }}
                     </p>
 
+                    <!-- Группа кнопок -->
                     <div class="btn-group w-100" role="group">
-                        <a href="{% url 'catalog:product_detail' product.pk %}" class="btn btn-outline-primary">
-                            👁️ Просмотр
+                        <!-- Просмотр (доступно всем) -->
+                        <a href="{% url 'catalog:product_detail' product.pk %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-eye"></i> Просмотр
                         </a>
-                        <a href="{% url 'catalog:product_update' product.pk %}" class="btn btn-outline-secondary">
-                            ✏️ Редактировать
+
+                        <!-- Редактирование (только владелец или модератор) -->
+                        {% if user == product.owner or perms.catalog.change_product %}
+                        <a href="{% url 'catalog:product_update' product.pk %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-edit"></i> Редактировать
                         </a>
-                        <a href="{% url 'catalog:product_delete' product.pk %}" class="btn btn-outline-danger">
-                            🗑️ Удалить
+                        {% endif %}
+
+                        <!-- Удаление (владелец или модератор) -->
+                        {% if user == product.owner or perms.catalog.delete_product %}
+                        <a href="{% url 'catalog:product_delete' product.pk %}" class="btn btn-outline-danger btn-sm">
+                            <i class="fas fa-trash"></i> Удалить
                         </a>
+                        {% endif %}
+
+                        <!-- Снять с публикации (только для модераторов и только опубликованных) -->
+                        {% if perms.catalog.can_unpublish_product and product.is_published %}
+                        <a href="{% url 'catalog:product_unpublish' product.pk %}" class="btn btn-outline-warning btn-sm">
+                            <i class="fas fa-ban"></i> Снять
+                        </a>
+                        {% endif %}
+
+                        <!-- Кнопки модерации (для продуктов на модерации) -->
+                        {% if perms.catalog.can_moderate_product and product.status == 'moderation' %}
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'catalog:product_moderate' product.pk 'approve' %}"
+                               class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-check"></i>
+                            </a>
+                            <a href="{% url 'catalog:product_moderate' product.pk 'reject' %}"
+                               class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="card-footer bg-transparent border-top-0">
-                    <small class="text-muted">
-                        📅 Создан: {{ product.created_at|date:"d.m.Y" }}
+
+                <div class="card-footer bg-transparent border-top-0 pt-0">
+                    <small class="text-muted owner-info">
+                        <i class="fas fa-calendar-alt"></i> Создан: {{ product.created_at|date:"d.m.Y H:i" }}
                         {% if product.updated_at != product.created_at %}
-                            <br>🔄 Обновлен: {{ product.updated_at|date:"d.m.Y" }}
+                            <br><i class="fas fa-sync-alt"></i> Обновлен: {{ product.updated_at|date:"d.m.Y H:i" }}
+                        {% endif %}
+                        {% if product.moderated_at %}
+                            <br><i class="fas fa-gavel"></i> Модерирован: {{ product.moderated_at|date:"d.m.Y H:i" }}
                         {% endif %}
                     </small>
                 </div>
@@ -99,14 +197,40 @@
     {% else %}
     <div class="empty-state">
         <div class="mb-4">
-            <i class="bi bi-inbox display-1 text-muted"></i>
+            <i class="fas fa-inbox display-1 text-muted"></i>
         </div>
         <h3 class="text-muted mb-3">Продукты отсутствуют</h3>
         <p class="text-muted mb-4">Добавьте первый продукт, чтобы начать работу</p>
+        {% if perms.catalog.add_product %}
         <a href="{% url 'catalog:product_create' %}" class="btn btn-primary btn-lg">
-            ➕ Добавить первый продукт
+            <i class="fas fa-plus"></i> Добавить первый продукт
         </a>
+        {% endif %}
     </div>
     {% endif %}
+
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Подсветка кнопок в зависимости от статуса
+    document.addEventListener('DOMContentLoaded', function() {
+        // Добавляем tooltip для кнопок
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(btn => {
+            btn.setAttribute('title', btn.textContent.trim());
+        });
+
+        // Динамическое обновление статистики (простой вариант)
+        const publishedCount = document.querySelectorAll('.badge.bg-success').length;
+        const draftCount = document.querySelectorAll('.badge.bg-secondary').length;
+        const moderationCount = document.querySelectorAll('.badge.bg-warning').length;
+
+        console.log('Статистика:');
+        console.log('- Опубликовано:', publishedCount);
+        console.log('- Черновиков:', draftCount);
+        console.log('- На модерации:', moderationCount);
+    });
+</script>
 {% endblock %}

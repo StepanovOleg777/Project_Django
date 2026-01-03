@@ -1,159 +1,326 @@
 {% extends 'catalog/base.html' %}
-
-{% block title %}
-    {% if object %}Редактирование {{ object.name }}{% else %}Создание продукта{% endif %}
-{% endblock %}
+{% load static %}
 
 {% block extra_css %}
 <style>
-    .form-card {
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border: none;
-        border-radius: 10px;
+    .status-badge {
+        font-size: 0.9rem;
+        padding: 0.25rem 0.5rem;
     }
-    .form-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 10px 10px 0 0 !important;
+    .status-draft { background-color: #6c757d; color: white; }
+    .status-moderation { background-color: #ffc107; color: black; }
+    .status-published { background-color: #198754; color: white; }
+    .status-rejected { background-color: #dc3545; color: white; }
+
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-left: 4px solid #007bff;
     }
-    .form-label {
-        font-weight: 600;
+
+    .form-section h5 {
         color: #495057;
-        margin-bottom: 8px;
-    }
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 2px solid #e9ecef;
-        transition: all 0.3s ease;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: #667eea;
-        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-    }
-    .form-control-lg {
-        font-size: 1.25rem;
-        font-weight: 600;
-    }
-    .file-input-custom {
-        padding: 12px;
-        background-color: #f8f9fa;
-        border: 2px dashed #dee2e6;
-        border-radius: 8px;
-        transition: all 0.3s ease;
-    }
-    .file-input-custom:hover {
-        border-color: #667eea;
-        background-color: #e9ecef;
-    }
-    .btn-primary {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        border-radius: 8px;
-        padding: 10px 30px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
-    }
-    .btn-secondary {
-        border-radius: 8px;
-        padding: 10px 30px;
-        font-weight: 600;
-    }
-    .field-icon {
-        margin-right: 8px;
-        opacity: 0.7;
-    }
-    .price-input {
-        font-weight: bold;
-        color: #28a745 !important;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #dee2e6;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="card form-card">
-                <div class="card-header form-header">
-                    <h4 class="card-title mb-0">
-                        <i class="bi bi-{% if object %}pencil-square{% else %}plus-circle{% endif %} me-2"></i>
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
                         {% if object %}
-                            ✏️ Редактирование: {{ object.name }}
+                            <i class="fas fa-edit"></i> Редактирование продукта
+                            <span class="badge status-badge status-{{ object.status }} float-end">
+                                {{ object.get_status_display }}
+                            </span>
                         {% else %}
-                            ➕ Создание нового продукта
+                            <i class="fas fa-plus"></i> Создание нового продукта
                         {% endif %}
                     </h4>
                 </div>
-                <div class="card-body p-4">
+
+                <div class="card-body">
                     <form method="post" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
 
-                        {% for field in form %}
-                        <div class="mb-4">
-                            <label for="{{ field.id_for_label }}" class="form-label">
-                                {% if field.name == 'name' %}📝{% endif %}
-                                {% if field.name == 'description' %}📄{% endif %}
-                                {% if field.name == 'category' %}📂{% endif %}
-                                {% if field.name == 'price' %}💰{% endif %}
-                                {% if field.name == 'image' %}🖼️{% endif %}
-                                {{ field.label }}
-                                {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
-                            </label>
+                        <!-- Сообщения об ошибках формы -->
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                            <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
 
-                            {{ field }}
-
-                            {% if field.help_text %}
-                                <div class="form-text text-muted mt-1">
-                                    <small>{{ field.help_text }}</small>
-                                </div>
-                            {% endif %}
-
-                            {% if field.errors %}
-                                <div class="alert alert-danger mt-2 p-2">
-                                    <small>
-                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                        {{ field.errors|striptags }}
-                                    </small>
-                                </div>
+                        <!-- Информация о продукте -->
+                        {% if object and object.owner %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-user"></i>
+                            <strong>Владелец:</strong> {{ object.owner.email }}
+                            <br>
+                            <i class="fas fa-calendar"></i>
+                            <strong>Создан:</strong> {{ object.created_at|date:"d.m.Y H:i" }}
+                            {% if object.moderated_at %}
+                            <br>
+                            <i class="fas fa-gavel"></i>
+                            <strong>Модерация:</strong> {{ object.moderated_at|date:"d.m.Y H:i" }}
                             {% endif %}
                         </div>
-                        {% endfor %}
+                        {% endif %}
 
-                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                            <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">
-                                ← Назад к списку
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                {% if object %}
-                                    💾 Сохранить изменения
-                                {% else %}
-                                    ✅ Создать продукт
+                        <!-- Основные поля -->
+                        <div class="form-section">
+                            <h5>Основная информация</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.name.id_for_label }}" class="form-label">
+                                        {{ form.name.label }} *
+                                    </label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.name.errors }}
+                                    </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        {{ form.name.help_text }}
+                                    </small>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.category.id_for_label }}" class="form-label">
+                                        {{ form.category.label }} *
+                                    </label>
+                                    {{ form.category }}
+                                    {% if form.category.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.category.errors }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.description.id_for_label }}" class="form-label">
+                                    {{ form.description.label }}
+                                </label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.description.errors }}
+                                </div>
                                 {% endif %}
-                            </button>
+                                <small class="form-text text-muted">
+                                    {{ form.description.help_text }}
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Цена и изображение -->
+                        <div class="form-section">
+                            <h5>Детали продукта</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.price.id_for_label }}" class="form-label">
+                                        {{ form.price.label }} *
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.price }}
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                    {% if form.price.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.price.errors }}
+                                    </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        {{ form.price.help_text }}
+                                    </small>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.image.id_for_label }}" class="form-label">
+                                        {{ form.image.label }}
+                                    </label>
+                                    {{ form.image }}
+                                    {% if form.image.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.image.errors }}
+                                    </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">
+                                        {{ form.image.help_text }}
+                                    </small>
+
+                                    {% if object and object.image %}
+                                    <div class="mt-2">
+                                        <img src="{{ object.image.url }}"
+                                             alt="{{ object.name }}"
+                                             class="img-thumbnail"
+                                             style="max-height: 100px;">
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   name="image-clear"
+                                                   id="image-clear-id">
+                                            <label class="form-check-label" for="image-clear-id">
+                                                Удалить текущее изображение
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Статус (только для определенных пользователей) -->
+                        {% if form.status and not form.status.is_hidden %}
+                        <div class="form-section">
+                            <h5>Статус продукта</h5>
+                            <div class="mb-3">
+                                <label for="{{ form.status.id_for_label }}" class="form-label">
+                                    {{ form.status.label }}
+                                </label>
+                                {{ form.status }}
+                                {% if form.status.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.status.errors }}
+                                </div>
+                                {% endif %}
+                                <small class="form-text text-muted">
+                                    {{ form.status.help_text }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Кнопки -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Назад к списку
+                            </a>
+
+                            <div>
+                                {% if object %}
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Сохранить изменения
+                                </button>
+                                {% else %}
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check"></i> Создать продукт
+                                </button>
+                                {% endif %}
+                            </div>
                         </div>
                     </form>
                 </div>
+
+                <!-- Дополнительные действия для существующего продукта -->
+                {% if object %}
+                <div class="card-footer bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Последнее обновление: {{ object.updated_at|date:"d.m.Y H:i" }}
+                        </small>
+
+                        <!-- Кнопки для модераторов -->
+                        {% if perms.catalog.can_moderate_product %}
+                        <div class="btn-group">
+                            {% if object.status == 'published' %}
+                            <a href="{% url 'catalog:product_unpublish' object.pk %}"
+                               class="btn btn-sm btn-warning">
+                                <i class="fas fa-ban"></i> Снять с публикации
+                            </a>
+                            {% endif %}
+
+                            {% if object.status == 'moderation' %}
+                            <a href="{% url 'catalog:product_moderate' object.pk 'approve' %}"
+                               class="btn btn-sm btn-success">
+                                <i class="fas fa-check"></i> Одобрить
+                            </a>
+                            <a href="{% url 'catalog:product_moderate' object.pk 'reject' %}"
+                               class="btn btn-sm btn-danger">
+                                <i class="fas fa-times"></i> Отклонить
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
-            <!-- Информационная панель -->
-            <div class="card mt-4">
-                <div class="card-header bg-light">
-                    <h6 class="mb-0">📋 Правила заполнения формы</h6>
-                </div>
-                <div class="card-body">
-                    <ul class="list-unstyled mb-0">
-                        <li class="mb-1">✅ Название и описание не должны содержать запрещенные слова</li>
-                        <li class="mb-1">✅ Цена должна быть положительным числом</li>
-                        <li class="mb-1">✅ Рекомендуется загружать изображение товара</li>
-                        <li class="mb-1">✅ Все поля, отмеченные *, обязательны для заполнения</li>
-                    </ul>
-                </div>
+            <!-- Предупреждение о запрещенных словах -->
+            <div class="alert alert-warning mt-3">
+                <h6><i class="fas fa-exclamation-triangle"></i> Внимание!</h6>
+                <p class="mb-0">
+                    Запрещено использовать следующие слова в названии и описании продукта:
+                    <strong>казино, криптовалюта, крипта, биржа, дешево, бесплатно, обман, полиция, радар</strong>.
+                    Продукты с такими словами будут автоматически отклонены.
+                </p>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Автоматическая проверка цены при вводе
+    document.addEventListener('DOMContentLoaded', function() {
+        const priceField = document.getElementById('{{ form.price.id_for_label }}');
+        if (priceField) {
+            priceField.addEventListener('input', function() {
+                const value = parseFloat(this.value);
+                if (value < 0) {
+                    this.classList.add('is-invalid');
+                    // Показываем сообщение об ошибке
+                    let errorDiv = this.nextElementSibling;
+                    if (!errorDiv || !errorDiv.classList.contains('invalid-feedback')) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.className = 'invalid-feedback d-block';
+                        errorDiv.textContent = 'Цена не может быть отрицательной';
+                        this.parentNode.appendChild(errorDiv);
+                    }
+                } else {
+                    this.classList.remove('is-invalid');
+                    const errorDiv = this.nextElementSibling;
+                    if (errorDiv && errorDiv.classList.contains('invalid-feedback')) {
+                        errorDiv.remove();
+                    }
+                }
+            });
+        }
+
+        // Подсветка поля статуса
+        const statusField = document.getElementById('{{ form.status.id_for_label }}');
+        if (statusField) {
+            function updateStatusColor() {
+                const value = statusField.value;
+                statusField.className = 'form-select';
+                if (value === 'published') {
+                    statusField.classList.add('border-success');
+                } else if (value === 'rejected') {
+                    statusField.classList.add('border-danger');
+                } else if (value === 'moderation') {
+                    statusField.classList.add('border-warning');
+                } else if (value === 'draft') {
+                    statusField.classList.add('border-secondary');
+                }
+            }
+
+            statusField.addEventListener('change', updateStatusColor);
+            updateStatusColor(); // Инициализация
+        }
+    });
+</script>
 {% endblock %}

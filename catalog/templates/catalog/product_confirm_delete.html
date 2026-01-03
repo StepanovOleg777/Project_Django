@@ -1,43 +1,82 @@
 {% extends 'catalog/base.html' %}
 
-{% block title %}Удаление продукта - {{ object.name }}{% endblock %}
-
 {% block content %}
-<div class="container mt-4">
+<div class="container">
     <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
+        <div class="col-lg-6">
+            <div class="card border-danger shadow">
                 <div class="card-header bg-danger text-white">
-                    <h4 class="card-title mb-0">Подтверждение удаления</h4>
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> Подтверждение удаления
+                    </h4>
                 </div>
-                <div class="card-body">
-                    <p class="alert alert-warning">
-                        <strong>Внимание!</strong> Вы собираетесь удалить продукт. Это действие нельзя отменить.
-                    </p>
 
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-exclamation-circle"></i> Внимание!
+                        </h5>
+                        <p class="mb-0">
+                            Вы собираетесь удалить продукт <strong>"{{ object.name }}"</strong>.
+                            Это действие невозможно отменить.
+                        </p>
+                    </div>
+
+                    <!-- Информация о продукте -->
                     <div class="card mb-3">
                         <div class="card-body">
-                            <h5 class="card-title">{{ object.name }}</h5>
-                            <p class="card-text">
-                                <strong>Категория:</strong> {{ object.category.name }}<br>
-                                <strong>Цена:</strong> {{ object.price }} руб.<br>
-                                <strong>Описание:</strong> {{ object.description|truncatechars:100 }}
-                            </p>
-                            {% if object.image %}
-                                <img src="{{ object.image.url }}" class="img-fluid rounded" alt="{{ object.name }}" style="max-height: 200px;">
-                            {% endif %}
+                            <h6>Информация о продукте:</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Название:</strong> {{ object.name }}</li>
+                                <li><strong>Цена:</strong> {{ object.price }} ₽</li>
+                                <li><strong>Категория:</strong> {{ object.category.name }}</li>
+                                <li>
+                                    <strong>Статус:</strong>
+                                    <span class="badge {% if object.status == 'published' %}bg-success{% elif object.status == 'draft' %}bg-secondary{% elif object.status == 'moderation' %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ object.get_status_display }}
+                                    </span>
+                                </li>
+                                {% if object.owner %}
+                                <li><strong>Владелец:</strong> {{ object.owner.email }}</li>
+                                {% endif %}
+                                <li><strong>Создан:</strong> {{ object.created_at|date:"d.m.Y H:i" }}</li>
+                            </ul>
                         </div>
                     </div>
 
+                    <!-- Информация о правах -->
+                    {% if is_moderator and not is_owner %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-user-shield"></i>
+                        <strong>Вы удаляете продукт как модератор.</strong>
+                        Продукт принадлежит другому пользователю.
+                    </div>
+                    {% elif is_owner %}
+                    <div class="alert alert-primary">
+                        <i class="fas fa-user"></i>
+                        <strong>Это ваш продукт.</strong> Вы удаляете свой собственный продукт.
+                    </div>
+                    {% endif %}
+
+                    <!-- Форма удаления -->
                     <form method="post">
                         {% csrf_token %}
                         <div class="d-flex justify-content-between">
-                            <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">Отмена</a>
+                            <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Отмена
+                            </a>
                             <button type="submit" class="btn btn-danger">
-                                Да, удалить продукт
+                                <i class="fas fa-trash"></i> Удалить навсегда
                             </button>
                         </div>
                     </form>
+                </div>
+
+                <div class="card-footer text-muted">
+                    <small>
+                        <i class="fas fa-info-circle"></i>
+                        Удаление продукта также удалит все связанные данные.
+                    </small>
                 </div>
             </div>
         </div>
