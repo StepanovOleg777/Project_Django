@@ -144,3 +144,6 @@ AUTH_USER_MODEL = 'users.User'
 # Настройки для медиафайлов
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Настройки почты для тестирования (письма выводятся в консоль)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
