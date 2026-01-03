@@ -1,9 +1,10 @@
-from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, \
+    UserChangeForm  # ← ДОБАВИТЬ AuthenticationForm
 from .models import User
 
 
 class CustomUserCreationForm(UserCreationForm):
-    """Форма для создания пользователя"""
+    """Форма для создания пользователя в админке"""
 
     class Meta:
         model = User
@@ -11,25 +12,14 @@ class CustomUserCreationForm(UserCreationForm):
 
 
 class CustomUserChangeForm(UserChangeForm):
-    """Форма для изменения пользователя"""
+    """Форма для изменения пользователя в админке"""
 
     class Meta:
         model = User
         fields = ('email',)
 
 
-class UserRegisterForm(UserCreationForm):
-    """Форма регистрации пользователя"""
-    class Meta:
-        model = User
-        fields = ('email', 'password1', 'password2')
-
-class UserLoginForm(AuthenticationForm):
-    """Форма авторизации через email"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['username'].label = 'Email'
-
+# === ФОРМЫ ДЛЯ РЕГИСТРАЦИИ И АВТОРИЗАЦИИ ===
 
 class UserRegisterForm(UserCreationForm):
     """Форма регистрации пользователя"""
