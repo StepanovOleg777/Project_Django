@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 
     'catalog',
     'blog',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -134,5 +135,12 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Кастомная модель пользователя
+AUTH_USER_MODEL = 'users.User'
+
+# Настройки для медиафайлов
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
