@@ -1,3 +1,4 @@
+# catalog/urls.py
 from django.urls import path
 from . import views
 from .views import ProductListView, ProductCreateView, ProductUpdateView, ProductDeleteView
@@ -19,5 +20,10 @@ urlpatterns = [
     # Действия модератора
     path('products/<int:pk>/unpublish/', views.unpublish_product, name='product_unpublish'),
     path('products/<int:pk>/moderate/<str:action>/', views.moderate_product, name='product_moderate'),
+
+    # Тест кеширования (для задания 1)
     path('test-cache/', views.test_cache_view, name='test_cache'),
+
+    # Продукты по категориям (для задания 3)
+    path('category/<int:category_id>/', views.category_products, name='category_products'),
 ]

@@ -1,0 +1,59 @@
+<!-- catalog/templates/catalog/category_products.html -->
+{% extends 'catalog/base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    {% if products %}
+        <div class="row row-cols-1 row-cols-md-3 g-4 mt-3">
+            {% for product in products %}
+            <div class="col">
+                <div class="card h-100">
+                    {% if product.image %}
+                    <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                    {% else %}
+                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                        <span class="text-muted">Нет изображения</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="{% url 'catalog:product_detail' product.pk %}" class="text-decoration-none">
+                                {{ product.name }}
+                            </a>
+                        </h5>
+                        <p class="card-text text-muted">{{ product.description|truncatechars:100 }}</p>
+                        <p class="card-text">
+                            <strong class="text-primary">{{ product.price }} ₽</strong>
+                        </p>
+                    </div>
+
+                    <div class="card-footer">
+                        <small class="text-muted">
+                            Добавлен: {{ product.created_at|date:"d.m.Y" }}
+                            {% if product.owner %}
+                            <br>Продавец: {{ product.owner.email }}
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info mt-4">
+            <p class="mb-0">В этой категории пока нет товаров.</p>
+        </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">
+            Вернуться ко всем товарам
+        </a>
+    </div>
+</div>
+{% endblock %}

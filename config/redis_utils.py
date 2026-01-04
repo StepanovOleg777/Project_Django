@@ -41,3 +41,38 @@ def get_cache_info():
         'redis_port': settings.REDIS_PORT,
         'redis_db': settings.REDIS_DB,
     }
+
+
+def clear_product_cache(product_id=None):
+    """
+    Очищает кеш для продукта(ов).
+
+    Args:
+        product_id: ID продукта или None для очистки всех продуктов
+    """
+    if not settings.CACHE_ENABLED:
+        return 0
+
+    try:
+        from django.core.cache import cache
+
+        if product_id:
+            # Очищаем кеш конкретного продукта
+            cache_key = f'product_detail_{product_id}'
+            if hasattr(cache, 'delete_pattern'):
+                # Для django-redis
+                return cache.delete_pattern(f'{cache_key}_*')
+            else:
+                # Для стандартного кеша
+                cache.delete(cache_key)
+                return 1
+        else:
+            # Очищаем кеш всех продуктов
+            if hasattr(cache, 'delete_pattern'):
+                return cache.delete_pattern('product_detail_*')
+            else:
+                # Для стандартного кеша нужно знать все ключи
+                return 0
+    except Exception as e:
+        print(f"Ошибка при очистке кеша: {e}")
+        return 0

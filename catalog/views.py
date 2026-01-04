@@ -1,288 +1,398 @@
+# catalog/views.py
+"""
+Представления для приложения catalog.
+"""
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
-from django.db.models import Q
-from .models import Product, Category
+from django.http import JsonResponse, HttpResponseForbidden
+from django.core.exceptions import PermissionDenied
+
+# Импорты для кеширования (задания 2, 4)
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
+from django.conf import settings
+
+from .models import Product, Category, Contact
 from .forms import ProductForm
 
 
 def home(request):
-    """Контроллер главной страницы"""
-    # Показываем только опубликованные продукты
-    products = Product.objects.filter(is_published=True)[:6]
+    """
+    Контроллер для главной страницы.
+    """
+    # Получаем 6 последних опубликованных продуктов
+    published_products = Product.objects.filter(
+        status='published',
+        is_published=True
+    ).select_related('category', 'owner').order_by('-created_at')[:6]
 
     context = {
-        'products': products,
-        'title': 'Главная - Магазин'
+        'title': 'Главная - Интернет-магазин',
+        'products': published_products,
     }
-    return render(request, "catalog/home.html", context)
+    return render(request, 'catalog/home.html', context)
 
 
 def contacts(request):
-    if request.method == "POST":
-        name = request.POST.get("name")
-        email = request.POST.get("email")
-        message = request.POST.get("message")
-        return render(request, "catalog/contacts.html", {"success": True})
-    return render(request, "catalog/contacts.html")
+    """
+    Контроллер для страницы контактов.
+    """
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        phone = request.POST.get('phone')
+        message = request.POST.get('message')
+
+        # Сохраняем контакт в БД
+        Contact.objects.create(
+            name=name,
+            phone=phone,
+            message=message
+        )
+
+        messages.success(request, 'Сообщение отправлено! Мы свяжемся с вами в ближайшее время.')
+        return redirect('catalog:contacts')
+
+    context = {
+        'title': 'Контакты',
+    }
+    return render(request, 'catalog/contacts.html', context)
 
 
+@cache_page(900)  # Кеширование на 15 минут (900 секунд) - ЗАДАНИЕ 2
 def product_detail(request, pk):
-    """Контроллер для страницы одного товара"""
-    # Разные правила доступа в зависимости от пользователя
-    user = request.user
+    """
+    Контроллер для отображения детальной информации о продукте.
+    С кешированием через декоратор (задание 2).
+    """
+    product = get_object_or_404(Product.objects.select_related('category', 'owner'), pk=pk)
 
-    if user.is_authenticated:
-        # Авторизованные пользователи видят больше
-        if user.is_superuser or user.groups.filter(name='Модератор продуктов').exists():
-            # Админы и модераторы видят все продукты
-            product = get_object_or_404(Product, pk=pk)
-        elif user.groups.filter(name='Контент-менеджер').exists():
-            # Контент-менеджеры видят все, кроме черновиков других пользователей
-            product = get_object_or_404(
-                Product.objects.exclude(status='draft', owner__isnull=False).exclude(
-                    status='draft', owner=user
-                ),
-                pk=pk
-            )
-        else:
-            # Обычные пользователи видят только опубликованные или свои продукты
-            product = get_object_or_404(
-                Product.objects.filter(
-                    Q(is_published=True) | Q(owner=user)
-                ),
-                pk=pk
-            )
-    else:
-        # Неавторизованные пользователи видят только опубликованные
-        product = get_object_or_404(Product.objects.filter(is_published=True), pk=pk)
+    # Проверяем права на просмотр
+    if product.status != 'published' and not product.is_published:
+        if not request.user.is_authenticated:
+            raise PermissionDenied("Требуется авторизация для просмотра этого товара")
+        if not (request.user == product.owner or
+                request.user.has_perm('catalog.view_product') or
+                request.user.has_perm('catalog.can_moderate_product')):
+            raise PermissionDenied("У вас нет прав для просмотра этого товара")
 
     context = {
         'product': product,
-        'title': f'{product.name} - Детали'
+        'can_edit': (
+                request.user.is_authenticated and
+                (request.user == product.owner or
+                 request.user.has_perm('catalog.change_product'))
+        ),
+        'can_delete': (
+                request.user.is_authenticated and
+                (request.user == product.owner or
+                 request.user.has_perm('catalog.delete_product'))
+        ),
+        'can_unpublish': (
+                request.user.is_authenticated and
+                request.user.has_perm('catalog.can_unpublish_product') and
+                product.is_published
+        ),
     }
+
     return render(request, 'catalog/product_detail.html', context)
 
 
 class ProductListView(ListView):
-    """Список всех продуктов"""
+    """
+    Контроллер для отображения списка продуктов.
+    """
     model = Product
     template_name = 'catalog/product_list.html'
     context_object_name = 'products'
-    paginate_by = 12
+    paginate_by = 10
 
     def get_queryset(self):
-        user = self.request.user
+        queryset = Product.objects.select_related('category', 'owner')
 
-        if user.is_authenticated:
-            if user.is_superuser or user.groups.filter(name='Модератор продуктов').exists():
-                # Админы и модераторы видят все
-                queryset = Product.objects.all().order_by('-created_at')
-            elif user.groups.filter(name='Контент-менеджер').exists():
-                # Контент-менеджеры видят все, кроме черновиков других пользователей
-                queryset = Product.objects.exclude(
-                    status='draft', owner__isnull=False
-                ).exclude(
-                    status='draft', owner=user
-                ).order_by('-created_at')
+        # Фильтрация по статусу для разных пользователей
+        if self.request.user.is_authenticated:
+            if self.request.user.has_perm('catalog.view_product'):
+                # Модераторы видят все продукты
+                return queryset.order_by('-created_at')
             else:
-                # Обычные пользователи видят опубликованные + свои продукты
-                queryset = Product.objects.filter(
-                    Q(is_published=True) | Q(owner=user)
-                ).order_by('-created_at')
+                # Обычные пользователи видят опубликованные и свои продукты
+                return queryset.filter(
+                    status='published',
+                    is_published=True
+                ) | queryset.filter(owner=self.request.user)
         else:
-            # Неавторизованные - только опубликованные
-            queryset = Product.objects.filter(is_published=True).order_by('-created_at')
-
-        # ВАЖНО: всегда возвращаем QuerySet, даже если пустой
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        # Получаем queryset для статистики
-        queryset = self.get_queryset()
-
-        # Статистика
-        context['total_products'] = queryset.count()
-        context['published_count'] = queryset.filter(is_published=True).count()
-        context['draft_count'] = queryset.filter(status='draft').count()
-        context['moderation_count'] = queryset.filter(status='moderation').count()
-        context['rejected_count'] = queryset.filter(status='rejected').count()
-
-        return context
+            # Неавторизованные видят только опубликованные
+            return queryset.filter(
+                status='published',
+                is_published=True
+            ).order_by('-created_at')
 
 
-class ProductCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    """Создание нового продукта"""
+class ProductCreateView(LoginRequiredMixin, CreateView):
+    """
+    Контроллер для создания нового продукта.
+    """
     model = Product
     form_class = ProductForm
     template_name = 'catalog/product_form.html'
-    success_url = reverse_lazy('catalog:product_list')
-    success_message = "Продукт '%(name)s' успешно создан!"
-
-    def get_form_kwargs(self):
-        """Передаем пользователя в форму"""
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
 
     def form_valid(self, form):
-        # Автоматически устанавливаем владельца
+        # Устанавливаем текущего пользователя как владельца
         form.instance.owner = self.request.user
 
-        # По умолчанию ставим статус "черновик" для обычных пользователей
-        # и "на модерации" для тех, кто может публиковать
-        if self.request.user.has_perm('catalog.can_moderate_product'):
-            form.instance.status = 'published'
-        else:
-            form.instance.status = 'draft'
+        # Если пользователь имеет право на публикацию, можно сразу публиковать
+        if self.request.user.has_perm('catalog.change_product'):
+            form.instance.status = 'moderation'
 
+        messages.success(self.request, 'Товар успешно создан!')
         return super().form_valid(form)
 
+    def get_success_url(self):
+        return reverse_lazy('catalog:product_detail', kwargs={'pk': self.object.pk})
 
-class ProductUpdateView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, UpdateView):
-    """Редактирование продукта"""
+
+class ProductUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    """
+    Контроллер для редактирования продукта.
+    """
     model = Product
     form_class = ProductForm
     template_name = 'catalog/product_form.html'
-    success_url = reverse_lazy('catalog:product_list')
-    success_message = "Продукт '%(name)s' успешно обновлен!"
-
-    def get_form_kwargs(self):
-        """Передаем пользователя в форму"""
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
 
     def test_func(self):
-        """Проверка прав доступа"""
         product = self.get_object()
-        user = self.request.user
+        return (self.request.user == product.owner or
+                self.request.user.has_perm('catalog.change_product'))
 
-        # 1. Суперпользователь всегда может редактировать
-        if user.is_superuser:
-            return True
+    def form_valid(self, form):
+        # Сбрасываем кеш этого продукта при обновлении - ЗАДАНИЕ 2
+        if settings.CACHE_ENABLED:
+            cache_key = f'product_detail_{self.object.pk}'
+            cache.delete(cache_key)
 
-        # 2. Владелец может редактировать
-        if product.owner == user:
-            return True
+        messages.success(self.request, 'Товар успешно обновлен!')
+        return super().form_valid(form)
 
-        # 3. Модератор может редактировать
-        if user.groups.filter(name='Модератор продуктов').exists():
-            return True
-
-        # 4. Контент-менеджер может редактировать
-        if user.groups.filter(name='Контент-менеджер').exists():
-            return True
-
-        return False
+    def get_success_url(self):
+        return reverse_lazy('catalog:product_detail', kwargs={'pk': self.object.pk})
 
 
-class ProductDeleteView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, DeleteView):
-    """Удаление продукта"""
+class ProductDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """
+    Контроллер для удаления продукта.
+    """
     model = Product
     template_name = 'catalog/product_confirm_delete.html'
     success_url = reverse_lazy('catalog:product_list')
-    success_message = "Продукт успешно удален!"
 
     def test_func(self):
-        """Проверка прав доступа"""
         product = self.get_object()
-        user = self.request.user
+        return (self.request.user == product.owner or
+                self.request.user.has_perm('catalog.delete_product'))
 
-        # 1. Суперпользователь всегда может удалять
-        if user.is_superuser:
-            return True
+    def delete(self, request, *args, **kwargs):
+        # Получаем продукт перед удалением
+        product = self.get_object()
 
-        # 2. Владелец может удалять
-        if product.owner == user:
-            return True
+        # Сбрасываем кеш этого продукта при удалении - ЗАДАНИЕ 2
+        if settings.CACHE_ENABLED:
+            cache_key = f'product_detail_{product.pk}'
+            cache.delete(cache_key)
 
-        # 3. Модератор может удалять
-        if user.groups.filter(name='Модератор продуктов').exists():
-            return True
+        # Удаляем продукт
+        response = super().delete(request, *args, **kwargs)
+        messages.success(request, 'Товар успешно удален!')
+        return response
 
-        return False
 
-
+@login_required
+@permission_required('catalog.can_unpublish_product', raise_exception=True)
 def unpublish_product(request, pk):
-    """Отмена публикации продукта"""
-    if not request.user.is_authenticated:
-        return redirect('users:login')
-
+    """
+    Контроллер для снятия продукта с публикации.
+    Доступно только пользователям с правом can_unpublish_product.
+    """
     product = get_object_or_404(Product, pk=pk)
-
-    # Проверяем право can_unpublish_product
-    if not request.user.has_perm('catalog.can_unpublish_product'):
-        raise PermissionDenied("У вас нет прав для отмены публикации")
 
     if request.method == 'POST':
-        # Получаем причину из формы
-        reason = request.POST.get('reason', '')
-
-        # Меняем статус
+        product.is_published = False
         product.status = 'draft'
-        product.moderator_comment = f"Снято с публикации. Причина: {reason}"
-        product.moderated_at = timezone.now()
         product.save()
 
-        messages.success(request, f'Публикация продукта "{product.name}" отменена')
-        return redirect('catalog:product_list')
+        # Сбрасываем кеш этого продукта - ЗАДАНИЕ 2
+        if settings.CACHE_ENABLED:
+            cache_key = f'product_detail_{product.pk}'
+            cache.delete(cache_key)
 
-    # GET запрос - показываем форму подтверждения
-    return render(request, 'catalog/product_unpublish.html', {'product': product})
+        messages.success(request, f'Товар "{product.name}" снят с публикации.')
+        return redirect('catalog:product_detail', pk=product.pk)
+
+    context = {
+        'product': product,
+    }
+    return render(request, 'catalog/product_unpublish.html', context)
 
 
+@login_required
+@permission_required('catalog.can_moderate_product', raise_exception=True)
 def moderate_product(request, pk, action):
-    """Модерация продукта"""
-    if not request.user.is_authenticated:
-        return redirect('users:login')
-
+    """
+    Контроллер для модерации продукта.
+    """
     product = get_object_or_404(Product, pk=pk)
-
-    # Проверяем право модерации
-    if not request.user.has_perm('catalog.can_moderate_product'):
-        raise PermissionDenied("У вас нет прав для модерации продуктов")
 
     if action == 'approve':
         product.status = 'published'
-        message = f'Продукт "{product.name}" одобрен и опубликован'
+        product.is_published = True
+        messages.success(request, f'Товар "{product.name}" одобрен и опубликован.')
     elif action == 'reject':
         product.status = 'rejected'
-        message = f'Продукт "{product.name}" отклонен'
+        product.is_published = False
+        messages.warning(request, f'Товар "{product.name}" отклонен.')
     else:
-        messages.error(request, 'Неверное действие')
-        return redirect('catalog:product_list')
+        messages.error(request, 'Неверное действие модерации.')
+        return redirect('catalog:product_detail', pk=pk)
 
-    product.moderated_at = timezone.now()
     product.save()
 
-    messages.success(request, message)
-    return redirect('catalog:product_list')
+    # Сбрасываем кеш этого продукта - ЗАДАНИЕ 2
+    if settings.CACHE_ENABLED:
+        cache_key = f'product_detail_{product.pk}'
+        cache.delete(cache_key)
+
+    return redirect('catalog:product_detail', pk=pk)
 
 
-from django.views.decorators.cache import cache_page
-from django.conf import settings
-
+# ================ ЗАДАНИЕ 1: Тестовая страница для проверки Redis ================
 
 @cache_page(60 * 15)  # Кешируем на 15 минут
 def test_cache_view(request):
     """
-    Тестовая страница для проверки кеширования.
+    Тестовая страница для проверки работы кеширования Redis.
+    Используется в задании 1.
     """
     import time
 
+    # Генерируем текущее время
     current_time = time.time()
 
     context = {
         'current_time': current_time,
         'cache_enabled': settings.CACHE_ENABLED,
-        'cache_timeout': 15,
+        'cache_timeout': 15,  # минут
     }
 
     return render(request, 'catalog/test_cache.html', context)
+
+
+# ================ ЗАДАНИЕ 3: Сервисная функция и представление для категорий ================
+
+def get_products_by_category(category_id):
+    """
+    Сервисная функция для получения всех продуктов в указанной категории.
+    Используется в задании 3.
+
+    Args:
+        category_id: ID категории
+
+    Returns:
+        QuerySet: Продукты в указанной категории
+    """
+    return Product.objects.filter(
+        category_id=category_id,
+        status='published',
+        is_published=True
+    ).select_related('owner').order_by('-created_at')
+
+
+def category_products(request, category_id):
+    """
+    Представление для отображения продуктов в указанной категории.
+    Используется в задании 3.
+    """
+    category = get_object_or_404(Category, id=category_id)
+
+    # Используем сервисную функцию для получения продуктов
+    products = get_products_by_category(category_id)
+
+    context = {
+        'category': category,
+        'products': products,
+        'title': f'Товары в категории: {category.name}',
+    }
+
+    return render(request, 'catalog/category_products.html', context)
+
+
+# ================ ЗАДАНИЕ 4: Низкоуровневое кеширование списка продуктов ================
+
+class CachedProductListView(ListView):
+    """
+    Контроллер для отображения списка продуктов с низкоуровневым кешированием.
+    Используется в задании 4.
+    """
+    model = Product
+    template_name = 'catalog/product_list.html'
+    context_object_name = 'products'
+    paginate_by = 10
+
+    def get_queryset(self):
+        # Проверяем, включено ли кеширование
+        if not settings.CACHE_ENABLED:
+            return self.get_uncached_queryset()
+
+        # Создаем уникальный ключ для кеша
+        cache_key = 'product_list'
+
+        # Пробуем получить данные из кеша
+        cached_data = cache.get(cache_key)
+
+        if cached_data is not None:
+            # Данные есть в кеше - возвращаем их
+            return cached_data
+
+        # Данных нет в кеше - получаем свежие данные
+        queryset = self.get_uncached_queryset()
+
+        # Сохраняем в кеш на 5 минут (300 секунд)
+        cache.set(cache_key, queryset, 300)
+
+        return queryset
+
+    def get_uncached_queryset(self):
+        """
+        Получение QuerySet без кеширования.
+        """
+        queryset = Product.objects.select_related('category', 'owner')
+
+        # Фильтрация по статусу для разных пользователей
+        if self.request.user.is_authenticated:
+            if self.request.user.has_perm('catalog.view_product'):
+                # Модераторы видят все продукты
+                return queryset.order_by('-created_at')
+            else:
+                # Обычные пользователи видят опубликованные и свои продукты
+                return queryset.filter(
+                    status='published',
+                    is_published=True
+                ) | queryset.filter(owner=self.request.user)
+        else:
+            # Неавторизованные видят только опубликованные
+            return queryset.filter(
+                status='published',
+                is_published=True
+            ).order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        """
+        Добавляем информацию о кешировании в контекст.
+        """
+        context = super().get_context_data(**kwargs)
+        context['cache_enabled'] = settings.CACHE_ENABLED
+        context['is_cached_view'] = True
+        return context
