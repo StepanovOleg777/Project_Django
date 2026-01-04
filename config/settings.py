@@ -141,6 +141,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Кастомная модель пользователя
 AUTH_USER_MODEL = 'users.User'
 
+# Настройки перенаправления при аутентификации
+LOGIN_URL = '/users/login/'
+LOGIN_REDIRECT_URL = '/catalog/'
+LOGOUT_REDIRECT_URL = '/'
+
 # Настройки для медиафайлов
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -149,7 +154,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 
-# ================ НАСТРОЙКИ REDIS ================
+#  Настройки REDIS
 REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
 REDIS_PORT = os.getenv('REDIS_PORT', '6379')
 REDIS_DB = os.getenv('REDIS_DB', '0')

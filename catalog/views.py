@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.core.exceptions import PermissionDenied
 
-# Импорты для кеширования (задания 2, 4)
+# Импорты для кеширования
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 from django.conf import settings
@@ -25,7 +25,6 @@ def home(request):
     """
     Контроллер для главной страницы.
     """
-    # Получаем 6 последних опубликованных продуктов
     published_products = Product.objects.filter(
         status='published',
         is_published=True
@@ -47,7 +46,6 @@ def contacts(request):
         phone = request.POST.get('phone')
         message = request.POST.get('message')
 
-        # Сохраняем контакт в БД
         Contact.objects.create(
             name=name,
             phone=phone,
@@ -63,15 +61,13 @@ def contacts(request):
     return render(request, 'catalog/contacts.html', context)
 
 
-@cache_page(900)  # Кеширование на 15 минут (900 секунд) - ЗАДАНИЕ 2
+@cache_page(900)
 def product_detail(request, pk):
     """
     Контроллер для отображения детальной информации о продукте.
-    С кешированием через декоратор (задание 2).
     """
     product = get_object_or_404(Product.objects.select_related('category', 'owner'), pk=pk)
 
-    # Проверяем права на просмотр
     if product.status != 'published' and not product.is_published:
         if not request.user.is_authenticated:
             raise PermissionDenied("Требуется авторизация для просмотра этого товара")
@@ -114,23 +110,67 @@ class ProductListView(ListView):
     def get_queryset(self):
         queryset = Product.objects.select_related('category', 'owner')
 
-        # Фильтрация по статусу для разных пользователей
         if self.request.user.is_authenticated:
             if self.request.user.has_perm('catalog.view_product'):
-                # Модераторы видят все продукты
                 return queryset.order_by('-created_at')
             else:
-                # Обычные пользователи видят опубликованные и свои продукты
                 return queryset.filter(
                     status='published',
                     is_published=True
                 ) | queryset.filter(owner=self.request.user)
         else:
-            # Неавторизованные видят только опубликованные
             return queryset.filter(
                 status='published',
                 is_published=True
             ).order_by('-created_at')
+
+
+class CachedProductListView(ListView):
+    """
+    Контроллер для отображения списка продуктов с низкоуровневым кешированием.
+    """
+    model = Product
+    template_name = 'catalog/product_list.html'
+    context_object_name = 'products'
+    paginate_by = 10
+
+    def get_queryset(self):
+        if not settings.CACHE_ENABLED:
+            return self.get_uncached_queryset()
+
+        cache_key = 'product_list'
+        cached_data = cache.get(cache_key)
+
+        if cached_data is not None:
+            return cached_data
+
+        queryset = self.get_uncached_queryset()
+        cache.set(cache_key, queryset, 300)
+
+        return queryset
+
+    def get_uncached_queryset(self):
+        queryset = Product.objects.select_related('category', 'owner')
+
+        if self.request.user.is_authenticated:
+            if self.request.user.has_perm('catalog.view_product'):
+                return queryset.order_by('-created_at')
+            else:
+                return queryset.filter(
+                    status='published',
+                    is_published=True
+                ) | queryset.filter(owner=self.request.user)
+        else:
+            return queryset.filter(
+                status='published',
+                is_published=True
+            ).order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cache_enabled'] = settings.CACHE_ENABLED
+        context['is_cached_view'] = True
+        return context
 
 
 class ProductCreateView(LoginRequiredMixin, CreateView):
@@ -142,12 +182,13 @@ class ProductCreateView(LoginRequiredMixin, CreateView):
     template_name = 'catalog/product_form.html'
 
     def form_valid(self, form):
-        # Устанавливаем текущего пользователя как владельца
         form.instance.owner = self.request.user
 
-        # Если пользователь имеет право на публикацию, можно сразу публиковать
         if self.request.user.has_perm('catalog.change_product'):
             form.instance.status = 'moderation'
+
+        if settings.CACHE_ENABLED:
+            cache.delete('product_list')
 
         messages.success(self.request, 'Товар успешно создан!')
         return super().form_valid(form)
@@ -170,10 +211,9 @@ class ProductUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
                 self.request.user.has_perm('catalog.change_product'))
 
     def form_valid(self, form):
-        # Сбрасываем кеш этого продукта при обновлении - ЗАДАНИЕ 2
         if settings.CACHE_ENABLED:
-            cache_key = f'product_detail_{self.object.pk}'
-            cache.delete(cache_key)
+            cache.delete(f'product_detail_{self.object.pk}')
+            cache.delete('product_list')
 
         messages.success(self.request, 'Товар успешно обновлен!')
         return super().form_valid(form)
@@ -196,15 +236,12 @@ class ProductDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
                 self.request.user.has_perm('catalog.delete_product'))
 
     def delete(self, request, *args, **kwargs):
-        # Получаем продукт перед удалением
         product = self.get_object()
 
-        # Сбрасываем кеш этого продукта при удалении - ЗАДАНИЕ 2
         if settings.CACHE_ENABLED:
-            cache_key = f'product_detail_{product.pk}'
-            cache.delete(cache_key)
+            cache.delete(f'product_detail_{product.pk}')
+            cache.delete('product_list')
 
-        # Удаляем продукт
         response = super().delete(request, *args, **kwargs)
         messages.success(request, 'Товар успешно удален!')
         return response
@@ -215,7 +252,6 @@ class ProductDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 def unpublish_product(request, pk):
     """
     Контроллер для снятия продукта с публикации.
-    Доступно только пользователям с правом can_unpublish_product.
     """
     product = get_object_or_404(Product, pk=pk)
 
@@ -224,17 +260,14 @@ def unpublish_product(request, pk):
         product.status = 'draft'
         product.save()
 
-        # Сбрасываем кеш этого продукта - ЗАДАНИЕ 2
         if settings.CACHE_ENABLED:
-            cache_key = f'product_detail_{product.pk}'
-            cache.delete(cache_key)
+            cache.delete(f'product_detail_{product.pk}')
+            cache.delete('product_list')
 
         messages.success(request, f'Товар "{product.name}" снят с публикации.')
         return redirect('catalog:product_detail', pk=product.pk)
 
-    context = {
-        'product': product,
-    }
+    context = {'product': product}
     return render(request, 'catalog/product_unpublish.html', context)
 
 
@@ -260,48 +293,16 @@ def moderate_product(request, pk, action):
 
     product.save()
 
-    # Сбрасываем кеш этого продукта - ЗАДАНИЕ 2
     if settings.CACHE_ENABLED:
-        cache_key = f'product_detail_{product.pk}'
-        cache.delete(cache_key)
+        cache.delete(f'product_detail_{product.pk}')
+        cache.delete('product_list')
 
     return redirect('catalog:product_detail', pk=pk)
 
 
-# ================ ЗАДАНИЕ 1: Тестовая страница для проверки Redis ================
-
-@cache_page(60 * 15)  # Кешируем на 15 минут
-def test_cache_view(request):
-    """
-    Тестовая страница для проверки работы кеширования Redis.
-    Используется в задании 1.
-    """
-    import time
-
-    # Генерируем текущее время
-    current_time = time.time()
-
-    context = {
-        'current_time': current_time,
-        'cache_enabled': settings.CACHE_ENABLED,
-        'cache_timeout': 15,  # минут
-    }
-
-    return render(request, 'catalog/test_cache.html', context)
-
-
-# ================ ЗАДАНИЕ 3: Сервисная функция и представление для категорий ================
-
 def get_products_by_category(category_id):
     """
     Сервисная функция для получения всех продуктов в указанной категории.
-    Используется в задании 3.
-
-    Args:
-        category_id: ID категории
-
-    Returns:
-        QuerySet: Продукты в указанной категории
     """
     return Product.objects.filter(
         category_id=category_id,
@@ -313,11 +314,9 @@ def get_products_by_category(category_id):
 def category_products(request, category_id):
     """
     Представление для отображения продуктов в указанной категории.
-    Используется в задании 3.
     """
     category = get_object_or_404(Category, id=category_id)
 
-    # Используем сервисную функцию для получения продуктов
     products = get_products_by_category(category_id)
 
     context = {
@@ -329,70 +328,19 @@ def category_products(request, category_id):
     return render(request, 'catalog/category_products.html', context)
 
 
-# ================ ЗАДАНИЕ 4: Низкоуровневое кеширование списка продуктов ================
-
-class CachedProductListView(ListView):
+@cache_page(60 * 15)
+def test_cache_view(request):
     """
-    Контроллер для отображения списка продуктов с низкоуровневым кешированием.
-    Используется в задании 4.
+    Тестовая страница для проверки работы кеширования Redis.
     """
-    model = Product
-    template_name = 'catalog/product_list.html'
-    context_object_name = 'products'
-    paginate_by = 10
+    import time
 
-    def get_queryset(self):
-        # Проверяем, включено ли кеширование
-        if not settings.CACHE_ENABLED:
-            return self.get_uncached_queryset()
+    current_time = time.time()
 
-        # Создаем уникальный ключ для кеша
-        cache_key = 'product_list'
+    context = {
+        'current_time': current_time,
+        'cache_enabled': settings.CACHE_ENABLED,
+        'cache_timeout': 15,
+    }
 
-        # Пробуем получить данные из кеша
-        cached_data = cache.get(cache_key)
-
-        if cached_data is not None:
-            # Данные есть в кеше - возвращаем их
-            return cached_data
-
-        # Данных нет в кеше - получаем свежие данные
-        queryset = self.get_uncached_queryset()
-
-        # Сохраняем в кеш на 5 минут (300 секунд)
-        cache.set(cache_key, queryset, 300)
-
-        return queryset
-
-    def get_uncached_queryset(self):
-        """
-        Получение QuerySet без кеширования.
-        """
-        queryset = Product.objects.select_related('category', 'owner')
-
-        # Фильтрация по статусу для разных пользователей
-        if self.request.user.is_authenticated:
-            if self.request.user.has_perm('catalog.view_product'):
-                # Модераторы видят все продукты
-                return queryset.order_by('-created_at')
-            else:
-                # Обычные пользователи видят опубликованные и свои продукты
-                return queryset.filter(
-                    status='published',
-                    is_published=True
-                ) | queryset.filter(owner=self.request.user)
-        else:
-            # Неавторизованные видят только опубликованные
-            return queryset.filter(
-                status='published',
-                is_published=True
-            ).order_by('-created_at')
-
-    def get_context_data(self, **kwargs):
-        """
-        Добавляем информацию о кешировании в контекст.
-        """
-        context = super().get_context_data(**kwargs)
-        context['cache_enabled'] = settings.CACHE_ENABLED
-        context['is_cached_view'] = True
-        return context
+    return render(request, 'catalog/test_cache.html', context)
