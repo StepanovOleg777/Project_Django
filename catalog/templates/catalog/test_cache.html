@@ -1,0 +1,58 @@
+<!-- catalog/templates/catalog/test_cache.html -->
+{% extends 'catalog/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Тест кеширования Redis</h4>
+                </div>
+                <div class="card-body">
+                    <h5>Статус системы</h5>
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td><strong>Кеширование</strong></td>
+                                <td>
+                                    {% if cache_enabled %}
+                                        <span class="badge bg-success">Включено</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Выключено</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Текущее время сервера</strong></td>
+                                <td><code>{{ current_time }}</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Время кеширования</strong></td>
+                                <td>{{ cache_timeout }} минут</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="alert alert-info">
+                        <h6>Как работает тест?</h6>
+                        <p class="mb-0">
+                            Эта страница кешируется на {{ cache_timeout }} минут.
+                            При обновлении страницы время сервера должно оставаться одинаковым.
+                        </p>
+                    </div>
+
+                    <div class="mt-3">
+                        <a href="{% url 'catalog:test_cache' %}" class="btn btn-primary">
+                            Обновить страницу
+                        </a>
+                        <a href="{% url 'catalog:home' %}" class="btn btn-secondary">
+                            На главную
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -19,4 +19,5 @@ urlpatterns = [
     # Действия модератора
     path('products/<int:pk>/unpublish/', views.unpublish_product, name='product_unpublish'),
     path('products/<int:pk>/moderate/<str:action>/', views.moderate_product, name='product_moderate'),
+    path('test-cache/', views.test_cache_view, name='test_cache'),
 ]

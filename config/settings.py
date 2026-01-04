@@ -147,3 +147,31 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Настройки почты для тестирования (письма выводятся в консоль)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+
+# ================ НАСТРОЙКИ REDIS ================
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+REDIS_DB = os.getenv('REDIS_DB', '0')
+
+# Настройка CACHE_ENABLED
+CACHE_ENABLED = os.getenv('CACHE_ENABLED', 'False').lower() == 'true'
+
+# Настройка CACHES
+if CACHE_ENABLED:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}',
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'KEY_PREFIX': 'django_shop',
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+        }
+    }

@@ -264,3 +264,25 @@ def moderate_product(request, pk, action):
 
     messages.success(request, message)
     return redirect('catalog:product_list')
+
+
+from django.views.decorators.cache import cache_page
+from django.conf import settings
+
+
+@cache_page(60 * 15)  # Кешируем на 15 минут
+def test_cache_view(request):
+    """
+    Тестовая страница для проверки кеширования.
+    """
+    import time
+
+    current_time = time.time()
+
+    context = {
+        'current_time': current_time,
+        'cache_enabled': settings.CACHE_ENABLED,
+        'cache_timeout': 15,
+    }
+
+    return render(request, 'catalog/test_cache.html', context)
