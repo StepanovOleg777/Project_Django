@@ -1,0 +1,119 @@
+<!-- catalog/templates/catalog/product_list.html -->
+{% extends 'catalog/base.html' %}
+
+{% block title %}Каталог товаров{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Каталог товаров</h2>
+
+    <div class="mb-3">
+        <a href="{% url 'catalog:product_create' %}" class="btn btn-success">Добавить товар</a>
+    </div>
+
+    {% if products %}
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            {% for product in products %}
+            <div class="col">
+                <div class="card h-100">
+                    {% if product.image %}
+                    <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                    {% else %}
+                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                        <span class="text-muted">Нет изображения</span>
+                    </div>
+                    {% endif %}
+
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="{% url 'catalog:product_detail' product.pk %}" class="text-decoration-none">
+                                {{ product.name }}
+                            </a>
+                        </h5>
+                        <p class="card-text">{{ product.description|truncatechars:100 }}</p>
+                        <p class="card-text">
+                            <strong class="text-primary">{{ product.price }} ₽</strong>
+                        </p>
+
+                        <div class="mb-2">
+                            <span class="badge
+                                {% if product.status == 'published' %}bg-success
+                                {% elif product.status == 'moderation' %}bg-warning
+                                {% elif product.status == 'draft' %}bg-secondary
+                                {% elif product.status == 'rejected' %}bg-danger
+                                {% endif %}">
+                                {{ product.get_status_display }}
+                            </span>
+
+                            {% if product.is_published %}
+                            <span class="badge bg-success">Опубликовано</span>
+                            {% endif %}
+                        </div>
+
+                        <p class="card-text">
+                            <small class="text-muted">
+                                Категория:
+                                <a href="{% url 'catalog:category_products' product.category.id %}" class="text-decoration-none">
+                                    {{ product.category.name }}
+                                </a>
+                            </small>
+                        </p>
+                    </div>
+
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">
+                                {{ product.created_at|date:"d.m.Y" }}
+                            </small>
+
+                            {% if request.user == product.owner or perms.catalog.delete_product %}
+                            <div>
+                                <a href="{% url 'catalog:product_update' product.pk %}" class="btn btn-sm btn-outline-primary">✏️</a>
+                                <a href="{% url 'catalog:product_delete' product.pk %}" class="btn btn-sm btn-outline-danger">🗑️</a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Пагинация -->
+        {% if is_paginated %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Назад</a>
+                </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперед</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+    {% else %}
+        <div class="alert alert-info mt-4">
+            <p class="mb-0">Товаров пока нет.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

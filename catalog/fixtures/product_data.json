@@ -1,0 +1,119 @@
+[
+{
+  "model": "catalog.product",
+  "pk": 9,
+  "fields": {
+    "name": "Python для начинающих",
+    "description": "Учебник по программированию",
+    "image": "",
+    "category": 6,
+    "price": "2499.99",
+    "created_at": "2025-11-24T07:35:54.615Z",
+    "updated_at": "2025-11-24T07:35:54.615Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 8,
+  "fields": {
+    "name": "Ноутбук",
+    "description": "Игровой ноутбук",
+    "image": "",
+    "category": 5,
+    "price": "129999.99",
+    "created_at": "2025-11-24T07:35:54.614Z",
+    "updated_at": "2025-11-24T07:35:54.614Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 7,
+  "fields": {
+    "name": "Смартфон",
+    "description": "Флагманский смартфон",
+    "image": "",
+    "category": 5,
+    "price": "54999.99",
+    "created_at": "2025-11-24T07:35:54.610Z",
+    "updated_at": "2025-11-24T07:36:56.014Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 6,
+  "fields": {
+    "name": "Джинсы",
+    "description": "Стильные джинсы облегающего кроя",
+    "image": "",
+    "category": 3,
+    "price": "4999.99",
+    "created_at": "2025-11-24T07:32:56.832Z",
+    "updated_at": "2025-11-24T07:32:56.832Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 5,
+  "fields": {
+    "name": "Python для начинающих",
+    "description": "Полное руководство по основам программирования на Python с примерами",
+    "image": "",
+    "category": 2,
+    "price": "2499.99",
+    "created_at": "2025-11-24T07:32:01.654Z",
+    "updated_at": "2025-11-24T07:32:01.654Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 4,
+  "fields": {
+    "name": "Война и мир",
+    "description": "Классический роман Льва Толстого в полном издании",
+    "image": "",
+    "category": 2,
+    "price": "1899.99",
+    "created_at": "2025-11-24T07:31:27.572Z",
+    "updated_at": "2025-11-24T07:31:27.572Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 3,
+  "fields": {
+    "name": "Футболка",
+    "description": "Хлопковая футболка",
+    "image": "",
+    "category": 3,
+    "price": "1999.99",
+    "created_at": "2025-11-24T07:22:33.573Z",
+    "updated_at": "2025-11-24T07:22:33.573Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 2,
+  "fields": {
+    "name": "Ноутбук",
+    "description": "Игровой ноутбук",
+    "image": "",
+    "category": 1,
+    "price": "89999.99",
+    "created_at": "2025-11-24T07:22:33.571Z",
+    "updated_at": "2025-11-24T07:22:33.572Z"
+  }
+},
+{
+  "model": "catalog.product",
+  "pk": 1,
+  "fields": {
+    "name": "Смартфон",
+    "description": "Современный смартфон",
+    "image": "",
+    "category": 1,
+    "price": "29999.99",
+    "created_at": "2025-11-24T07:22:33.568Z",
+    "updated_at": "2025-11-24T07:22:33.568Z"
+  }
+}
+]

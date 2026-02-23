@@ -1,0 +1,82 @@
+{% extends 'catalog/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-ban"></i> Снятие с публикации
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-exclamation-triangle"></i> Внимание!
+                        </h5>
+                        <p class="mb-0">
+                            Вы собираетесь снять с публикации продукт:
+                            <strong>"{{ product.name }}"</strong>.
+                            После этого продукт будет перемещен в черновики и станет недоступен для обычных пользователей.
+                        </p>
+                    </div>
+
+                    <!-- Информация о продукте -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6><i class="fas fa-info-circle"></i> Информация о продукте:</h6>
+                            <ul class="list-unstyled">
+                                <li><strong>Название:</strong> {{ product.name }}</li>
+                                <li><strong>Цена:</strong> {{ product.price }} ₽</li>
+                                <li><strong>Категория:</strong> {{ product.category.name }}</li>
+                                <li><strong>Статус:</strong>
+                                    <span class="badge bg-success">Опубликовано</span>
+                                </li>
+                                {% if product.owner %}
+                                <li><strong>Владелец:</strong> {{ product.owner.email }}</li>
+                                {% endif %}
+                                <li><strong>Создан:</strong> {{ product.created_at|date:"d.m.Y H:i" }}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Форма снятия с публикации -->
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="reason" class="form-label fw-bold">
+                                <i class="fas fa-comment"></i> Причина снятия с публикации:
+                            </label>
+                            <textarea name="reason" id="reason" class="form-control" rows="4"
+                                      placeholder="Укажите причину снятия с публикации..."
+                                      required></textarea>
+                            <div class="form-text">
+                                Обязательно укажите причину для владельца продукта.
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'catalog:product_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Отмена
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-ban"></i> Снять с публикации
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card-footer text-muted">
+                    <small>
+                        <i class="fas fa-shield-alt"></i>
+                        Это действие доступно только модераторам с правом "Может отменять публикацию продукта".
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
